@@ -514,6 +514,7 @@ def main():
     target = fetch_drive_videos(drive)
     if not target:
         log("Nothing to do. Exiting.")
+        _log_handle.flush()
         upload_log_to_drive(drive)
         close_log()
         return
@@ -591,7 +592,7 @@ def main():
     log(f"  Drive file     : {'🗑️  Trashed' if ig_post_id or yt_video_id else '⚠️  Kept (both failed)'}")
     log(f"  Log saved to   : {LOG_FILE}")
     log("=" * 55)
-
+    _log_handle.flush()
     upload_log_to_drive(drive)
     close_log()
 
