@@ -64,7 +64,7 @@ def close_log():
 
 def upload_log_to_drive(drive):
     """Upload session log file to Google Drive logs folder."""
-    log("☁️ Uploading log file to Google Drive...")
+    print("☁️ Uploading log file to Google Drive...")
 
     LOGS_FOLDER_ID = "1bniekPJ8HPIGOHAJK602KuhmQ5XmWKfB"
 
@@ -84,7 +84,7 @@ def upload_log_to_drive(drive):
         fields="id,name"
     ).execute()
 
-    log(f"✅ Log uploaded to Drive: {uploaded['name']}")
+    print(f"✅ Log uploaded to Drive: {uploaded['name']}")
 
 
 # ══════════════════════════════════════════════════════════
