@@ -414,7 +414,19 @@ def publish_instagram_reel(video_url):
 
 def publish_youtube_short(youtube, file_path, file_name):
     """Upload local converted video to YouTube as a Short. Returns video ID or None."""
-    title = os.path.splitext(file_name)[0] + YT_TITLE_SUFFIX
+    
+    base_name = os.path.splitext(file_name)[0]
+
+    # Extract episode number from brackets
+    episode_match = re.search(r"\((\d+)\)", base_name)
+
+    # Extract part number after 'clip'
+    part_match = re.search(r"clip(\d+)", base_name)
+
+    episode_no = episode_match.group(1) if episode_match else "0"
+    part_no = part_match.group(1) if part_match else "0"
+
+    title = f"Episode {episode_no} Part {part_no}{YT_TITLE_SUFFIX}"
 
     body = {
         "snippet": {
