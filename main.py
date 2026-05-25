@@ -514,8 +514,8 @@ def main():
     target = fetch_drive_videos(drive)
     if not target:
         log("Nothing to do. Exiting.")
-        close_log()
         upload_log_to_drive(drive)
+        close_log()
         return
 
     file_id   = target["id"]
@@ -592,8 +592,8 @@ def main():
     log(f"  Log saved to   : {LOG_FILE}")
     log("=" * 55)
 
-    close_log()
     upload_log_to_drive(drive)
+    close_log()
 
 
 if __name__ == "__main__":
