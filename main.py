@@ -1,3 +1,4 @@
+
 """
 Unified Auto-Uploader: Instagram Reels + YouTube Shorts
 ---------------------------------------------------------
@@ -105,9 +106,9 @@ IG_ACCESS_TOKEN = os.environ["IG_ACCESS_TOKEN"]
 INSTAGRAM_ID    = os.environ["IG_ID"]
 
 
-IG_CAPTION= """What starts as justice slowly turns into obsession… and that’s what makes Death Note one of the greatest psychological thriller anime of all time.
+IG_CAPTION= """What starts as justice slowly turns into obsession… and that's what makes Death Note one of the greatest psychological thriller anime of all time.
 
-The battle between Light Yagami and L isn’t just about intelligence — it’s a war of ideology, ego, manipulation, and power. Every episode keeps raising the tension, every move feels like a chess match, and every scene reminds us why Death Note became a legendary anime worldwide.
+The battle between Light Yagami and L isn't just about intelligence — it's a war of ideology, ego, manipulation, and power. Every episode keeps raising the tension, every move feels like a chess match, and every scene reminds us why Death Note became a legendary anime worldwide.
 
 This scene perfectly captures the dark atmosphere, genius writing, intense mind games, and iconic character development that made Death Note a masterpiece for anime fans.
 
@@ -515,11 +516,17 @@ def main():
     check_ffmpeg()
 
     # ── Authenticate both services ───────────────────────
+    # Drive auth is critical — nothing works without it
     log("\n🔐 Authenticating Drive / Instagram (Reel project)...")
     drive = get_drive_ig_service()
 
+    # YouTube auth failure is isolated — only YouTube upload will be skipped
     log("🔐 Authenticating YouTube (YouTube project)...")
-    youtube = get_youtube_service()
+    youtube = None
+    try:
+        youtube = get_youtube_service()
+    except Exception as e:
+        log(f"⚠️  YouTube auth failed — YouTube upload will be skipped. Reason: {e}")
 
     # ── Fetch first video from Drive ─────────────────────
     log("\n" + "─" * 55)
@@ -541,73 +548,49 @@ def main():
     ig_post_id     = None
     yt_video_id    = None
 
+    # ── Step 2: Download ──────────────────────────────────
+    # Critical — can't proceed without the file
+    log("\n" + "─" * 55)
+    raw_path = download_from_drive(drive, file_id, file_name)
+
+    # ── Step 3: FFmpeg convert ────────────────────────────
+    # Critical — can't upload without a converted file
+    log("\n" + "─" * 55)
+    converted_path = convert_to_vertical(raw_path)
+
+    # Raw download no longer needed after conversion
+    cleanup(raw_path)
+    raw_path = None
+
     try:
-        # ── Step 2: Download ──────────────────────────────
-        log("\n" + "─" * 55)
-        raw_path = download_from_drive(drive, file_id, file_name)
-
-        # ── Step 3: FFmpeg convert ────────────────────────
-        log("\n" + "─" * 55)
-        converted_path = convert_to_vertical(raw_path)
-
-        # Raw download no longer needed after conversion
-        cleanup(raw_path)
-        raw_path = None
-
         # ── Step 4: Upload to Cloudinary ──────────────────
+        # Instagram depends on this; YouTube does NOT (uses local file)
         log("\n" + "─" * 55)
-        video_url, cloudinary_id = upload_to_cloudinary(converted_path)
+        video_url    = None
+        cloudinary_id = None
+        try:
+            video_url, cloudinary_id = upload_to_cloudinary(converted_path)
+        except Exception as e:
+            log(f"⚠️  Cloudinary upload failed — Instagram will be skipped. Reason: {e}")
 
         # ── Step 5: Publish Instagram Reel ────────────────
+        # Only runs if Cloudinary upload succeeded
         log("\n" + "─" * 55)
-        ig_post_id = publish_instagram_reel(video_url)
+        if video_url:
+            try:
+                ig_post_id = publish_instagram_reel(video_url)
+            except Exception as e:
+                log(f"⚠️  Instagram upload failed — continuing. Reason: {e}")
+                ig_post_id = None
+        else:
+            log("⏭️  Skipping Instagram — no Cloudinary URL available.")
 
         # ── Step 6: Upload YouTube Short ──────────────────
+        # Independent of Cloudinary/Instagram — uses local converted file
         log("\n" + "─" * 55)
-        yt_video_id = publish_youtube_short(youtube, converted_path, file_name)
-
-        # ── Step 7: Delete from Cloudinary ────────────────
-        log("\n" + "─" * 55)
-        if cloudinary_id:
-            delete_from_cloudinary(cloudinary_id)
-            cloudinary_id = None
-
-        # ── Step 8: Trash Drive file (only if at least one platform succeeded) ──
-        log("\n" + "─" * 55)
-        if ig_post_id or yt_video_id:
-            trash_drive_file(drive, file_id, file_name)
-        else:
-            log("⚠️  Both uploads failed — Drive file NOT trashed.")
-
-    except Exception as e:
-        log(f"\n❌ FATAL ERROR: {e}")
-        import traceback
-        log(traceback.format_exc())
-
-        # Best-effort Cloudinary cleanup on unexpected crash
-        if cloudinary_id:
+        if youtube is not None:
             try:
-                delete_from_cloudinary(cloudinary_id)
-            except Exception:
-                log("⚠️  Could not clean up Cloudinary after error.")
-
-    finally:
-        cleanup(raw_path, converted_path)
-
-    # ── Summary ───────────────────────────────────────────
-    log("\n" + "=" * 55)
-    log("  📊 SESSION SUMMARY")
-    log("=" * 55)
-    log(f"  File processed : {file_name}")
-    log(f"  Instagram Reel : {'✅ ' + str(ig_post_id) if ig_post_id else '❌ Failed'}")
-    log(f"  YouTube Short  : {'✅ https://youtube.com/shorts/' + str(yt_video_id) if yt_video_id else '❌ Failed'}")
-    log(f"  Drive file     : {'🗑️  Trashed' if ig_post_id or yt_video_id else '⚠️  Kept (both failed)'}")
-    log(f"  Log saved to   : {LOG_FILE}")
-    log("=" * 55)
-    _log_handle.flush()
-    upload_log_to_drive(drive)
-    close_log()
-
-
-if __name__ == "__main__":
-    main()
+                yt_video_id = publish_youtube_short(youtube, converted_path, file_name)
+            except Exception as e:
+                log(f"⚠️  YouTube upload failed — continuing. Reason: {e}")
+               
